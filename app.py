@@ -8,7 +8,7 @@ from google.genai import types
 # from google.cloud import texttospeech
 import asyncio
 import edge_tts
-import requests
+from gradio_client import Client
 
 
 # ============================================================
@@ -267,34 +267,47 @@ def text_to_speech(text, voice_name="en-US-AriaNeural"):
 
 
 def bark_text_to_audio(text):
-    hf_token = st.secrets["HF_TOKEN"]
+    hf_token = st.secrets.get("HF_TOKEN")
 
-    api_url = (
-        "https://router.huggingface.co/"
-        "hf-inference/models/suno/bark"
+    if hf_token:
+        client = Client(
+            "suno/bark",
+            token=hf_token,
+        )
+    else:
+        client = Client("suno/bark")
+
+    result = client.predict(
+        text,
+        "Speaker 1 (en)",
+        api_name="/gen_tts",
     )
 
-    headers = {
-        "Authorization": f"Bearer {hf_token}",
-        "Content-Type": "application/json",
-    }
+    # Bark Space returns:
+    # (sample_rate, numpy_audio_array)
 
-    response = requests.post(
-        api_url,
-        headers=headers,
-        json={
-            "inputs": text
-        },
-        timeout=180,
+    sample_rate, audio_array = result
+
+    import io
+    import wave
+    import numpy as np
+
+    audio_array = np.asarray(
+        audio_array,
+        dtype=np.int16,
     )
 
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Hugging Face API error "
-            f"{response.status_code}: {response.text}"
+    buffer = io.BytesIO()
+
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(
+            audio_array.tobytes()
         )
 
-    return response.content
+    return buffer.getvalue()
 
 # ============================================================
 # JSON PARSER
@@ -861,32 +874,32 @@ if st.button(
         # ====================================================
 
         elif generation_type == "Music":
-
-           with st.spinner("Generating audio with Suno Bark..."):
-            
+        
+            with st.spinner("Generating audio with Suno Bark..."):
+        
                 try:
                     audio_output = bark_text_to_audio(
                         text_input
                     )
-            
+        
                     st.success(
-                        "Audio generated successfully!"
+                        "Bark audio generated successfully!"
                     )
-            
+        
                     st.audio(
                         audio_output,
                         format="audio/wav",
                     )
-            
+        
                     st.download_button(
                         "⬇️ Download Audio",
                         data=audio_output,
-                        file_name="generated_audio.wav",
+                        file_name="generated_bark_audio.wav",
                         mime="audio/wav",
                         use_container_width=True,
                     )
-            
+        
                 except Exception as error:
                     st.error(
-                        f"Music generation failed: {error}"
+                        f"Bark generation failed: {error}"
                     )
