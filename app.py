@@ -8,6 +8,7 @@ from google.genai import types
 # from google.cloud import texttospeech
 import asyncio
 import edge_tts
+import requests
 
 
 # ============================================================
@@ -263,6 +264,33 @@ def text_to_speech(text, voice_name="en-US-AriaNeural"):
         return bytes(audio_data)
 
     return asyncio.run(generate())
+
+
+def bark_text_to_audio(text):
+    hf_token = st.secrets["HF_TOKEN"]
+
+    api_url = "https://api-inference.huggingface.co/models/suno/bark"
+
+    headers = {
+        "Authorization": f"Bearer {hf_token}"
+    }
+
+    response = requests.post(
+        api_url,
+        headers=headers,
+        json={
+            "inputs": text
+        },
+        timeout=180,
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Hugging Face API error "
+            f"{response.status_code}: {response.text}"
+        )
+
+    return response.content
 
 # ============================================================
 # JSON PARSER
@@ -830,27 +858,30 @@ if st.button(
 
         elif generation_type == "Music":
 
-            st.info(
-                "Music generation will use a local music model."
-            )
-
-            with st.spinner("Generating music..."):
-
+           with st.spinner("Generating audio with Suno Bark..."):
+            
                 try:
-                    # Music model code will go here
-                    # Example:
-                    #
-                    # audio_output = generate_music(text_input)
-                    #
-                    # st.audio(
-                    #     audio_output,
-                    #     format="audio/wav"
-                    # )
-
-                    st.warning(
-                        "Music generation model is not connected yet."
+                    audio_output = bark_text_to_audio(
+                        text_input
                     )
-
+            
+                    st.success(
+                        "Audio generated successfully!"
+                    )
+            
+                    st.audio(
+                        audio_output,
+                        format="audio/wav",
+                    )
+            
+                    st.download_button(
+                        "⬇️ Download Audio",
+                        data=audio_output,
+                        file_name="generated_audio.wav",
+                        mime="audio/wav",
+                        use_container_width=True,
+                    )
+            
                 except Exception as error:
                     st.error(
                         f"Music generation failed: {error}"
