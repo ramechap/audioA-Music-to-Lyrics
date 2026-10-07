@@ -269,10 +269,14 @@ def text_to_speech(text, voice_name="en-US-AriaNeural"):
 def bark_text_to_audio(text):
     hf_token = st.secrets["HF_TOKEN"]
 
-    api_url = "https://api-inference.huggingface.co/models/suno/bark"
+    api_url = (
+        "https://router.huggingface.co/"
+        "hf-inference/models/suno/bark"
+    )
 
     headers = {
-        "Authorization": f"Bearer {hf_token}"
+        "Authorization": f"Bearer {hf_token}",
+        "Content-Type": "application/json",
     }
 
     response = requests.post(
