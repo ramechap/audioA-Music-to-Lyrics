@@ -258,48 +258,76 @@ def parse_json(text):
 # ============================================================
 
 AUDIO_PROMPT = """
-Analyze the uploaded audio recording.
+Analyze the uploaded audio carefully.
 
-Your job is to perform speech/audio recognition.
+First determine what type of audio it is:
+1. "song" — if the main content is singing/music
+2. "speech" — if the main content is spoken language, conversation, interview, lecture, podcast, etc.
+3. "mixed" — if it contains both meaningful singing and speech
 
-Requirements:
-
-1. Detect the primary spoken language.
-2. Produce the complete spoken transcript as accurately as possible.
-3. Preserve the speaker's actual words.
-4. Do not invent missing words.
-5. If a section is unclear, mark it as [inaudible] rather than guessing.
-6. Give a concise summary.
-7. Extract the most important key points.
-8. Extract useful keywords.
-9. Identify speakers when possible.
-10. If there are multiple speakers, describe them as Speaker 1, Speaker 2, etc.
-11. Do not claim a person's real identity unless the audio itself provides it.
-12. If the recording contains no understandable speech, say so clearly.
-
-Return ONLY valid JSON.
-
-Use exactly this structure:
+Return ONLY valid JSON in this exact structure:
 
 {
+  "audio_type": "song | speech | mixed",
   "language": "detected language",
-  "transcript": "complete transcript",
+  "title": "song title if identifiable, otherwise empty string",
+  "content": "",
   "summary": "short summary",
-  "key_points": [
-    "point 1",
-    "point 2"
-  ],
-  "keywords": [
-    "keyword 1",
-    "keyword 2"
-  ],
-  "speakers": [
-    {
-      "speaker": "Speaker 1",
-      "description": "description if available"
-    }
-  ]
+  "key_points": [],
+  "keywords": [],
+  "speakers": []
 }
+
+IMPORTANT RULES:
+
+FOR SONGS:
+- Put the actual sung words in "content".
+- Format them beautifully like real lyrics.
+- Use section labels when identifiable:
+  [Intro]
+  [Verse 1]
+  [Pre-Chorus]
+  [Chorus]
+  [Verse 2]
+  [Bridge]
+  [Outro]
+- Put each sung line on its own line.
+- Preserve repetitions.
+- Preserve background vocals/ad-libs when clearly audible.
+- Do not turn lyrics into a normal paragraph.
+- Do not summarize or rewrite the lyrics.
+- Do not translate the lyrics.
+- If a word is unclear, write [inaudible].
+- If the song title is not clearly known, leave "title" empty.
+
+FOR SPEECH:
+- Put the complete spoken transcript in "content".
+- Format it naturally as readable speech.
+- Use paragraphs instead of lyric-style lines.
+- Preserve the speaker's actual words.
+- Do not add [Verse], [Chorus], or other song labels.
+- If different speakers can be distinguished, use:
+  Speaker 1:
+  Speaker 2:
+- Do not summarize instead of transcribing.
+- If something is unclear, write [inaudible].
+
+FOR MIXED AUDIO:
+- Clearly separate singing and speech.
+- Format the singing portion like lyrics.
+- Format spoken portions like normal speech.
+- Use appropriate labels such as:
+  [Song]
+  [Speech]
+  [Verse]
+  [Chorus]
+
+GENERAL RULES:
+- Do not invent words.
+- Do not paraphrase the audio.
+- Preserve the original language.
+- Preserve meaningful repetitions.
+- Return only valid JSON.
 """
 
 
@@ -418,10 +446,19 @@ if uploaded_audio:
                     )
 
                     result = parse_json(raw_response)
-
+                    
                     # Ensure expected fields exist.
+                    # result.setdefault("language", "Unknown")
+                    # result.setdefault("transcript", "")
+                    # result.setdefault("summary", "")
+                    # result.setdefault("key_points", [])
+                    # result.setdefault("keywords", [])
+                    # result.setdefault("speakers", [])
+
+                    result.setdefault("audio_type", "speech")
                     result.setdefault("language", "Unknown")
-                    result.setdefault("transcript", "")
+                    result.setdefault("title", "")
+                    result.setdefault("content", "")
                     result.setdefault("summary", "")
                     result.setdefault("key_points", [])
                     result.setdefault("keywords", [])
@@ -469,26 +506,78 @@ if result:
     )
 
     with tab_transcript:
-        st.subheader("Transcript")
-
+        audio_type = result.get("audio_type", "speech")
         language = result.get("language", "Unknown")
-
-        st.info(f"Detected language: **{language}**")
-
-        transcript = result.get(
-            "transcript",
-            "",
+        title = result.get("title", "")
+        content = result.get("content", "")
+    
+        st.info(
+            f"Detected language: **{language}**  \n"
+            f"Audio type: **{audio_type.title()}**"
         )
-
-        if transcript:
-            st.text_area(
-                "Full transcript",
-                transcript,
-                height=400,
-            )
+    
+        if audio_type == "song":
+            st.subheader("🎵 Lyrics")
+        
+            if title:
+                st.markdown(f"# 🎵 {title}")
+        
+            if content:
+                # Make lyrics look like a real lyrics page
+                formatted_lyrics = content.replace("\n", "  \n")
+        
+                st.markdown(
+                    f"""
+                    <div style="
+                        max-width: 750px;
+                        margin: auto;
+                        padding: 35px;
+                        border-radius: 18px;
+                        background-color: rgba(128, 128, 128, 0.08);
+                        line-height: 1.9;
+                        font-size: 18px;
+                        white-space: normal;
+                    ">
+                    {formatted_lyrics}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        
+                st.download_button(
+                    "⬇️ Download Lyrics",
+                    data=content,
+                    file_name="song_lyrics.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+        
+            else:
+                st.warning("No lyrics were detected.")
+    
+        elif audio_type == "speech":
+            st.subheader("🗣️ Transcript")
+    
+            if content:
+                st.text_area(
+                    "Transcript",
+                    content,
+                    height=500,
+                )
+            else:
+                st.warning("No speech transcript was returned.")
+    
         else:
-            st.warning("No transcript was returned.")
-
+            st.subheader("🎙️ Mixed Audio")
+    
+            if content:
+                st.text_area(
+                    "Content",
+                    content,
+                    height=600,
+                )
+            else:
+                st.warning("No audio content was returned.")
     with tab_summary:
         st.subheader("Summary")
 
@@ -568,21 +657,23 @@ if result:
     with tab_download:
         st.subheader("Download Results")
 
-        transcript = result.get(
-            "transcript",
-            "",
+        content = result.get("content", "")
+        audio_type = result.get("audio_type", "speech")
+        
+        content_text = (
+            f"Audio type: {audio_type}\n"
+            f"Detected language: {result.get('language', 'Unknown')}\n\n"
         )
-
-        transcript_text = (
-            f"Detected language: "
-            f"{result.get('language', 'Unknown')}\n\n"
-            f"{transcript}"
-        )
-
+        
+        if result.get("title"):
+            content_text += f"Title: {result.get('title')}\n\n"
+        
+        content_text += content
+        
         st.download_button(
-            "⬇️ Download Transcript",
-            data=transcript_text,
-            file_name="audio_transcript.txt",
+            "⬇️ Download Transcript / Lyrics",
+            data=content_text,
+            file_name="audio_content.txt",
             mime="text/plain",
             use_container_width=True,
         )
