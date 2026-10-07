@@ -5,6 +5,9 @@ import time
 import streamlit as st
 from google import genai
 from google.genai import types
+# from google.cloud import texttospeech
+import asyncio
+import edge_tts
 
 
 # ============================================================
@@ -212,6 +215,54 @@ def call_gemini_audio(
 
     raise RuntimeError(str(last_error))
 
+#cloud text-to-speech require billing
+def Cloudtext_to_speech(text, language_code="en-US", voice_name=None):
+    client = texttospeech.TextToSpeechClient()
+
+    synthesis_input = texttospeech.SynthesisInput(
+        text=text
+    )
+
+    if voice_name:
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=language_code,
+            name=voice_name,
+        )
+    else:
+        voice = texttospeech.VoiceSelectionParams(
+            language_code=language_code,
+            ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL,
+        )
+
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3
+    )
+
+    response = client.synthesize_speech(
+        input=synthesis_input,
+        voice=voice,
+        audio_config=audio_config,
+    )
+
+    return response.audio_content
+
+#using edge-tts library for text-to-spech microsoft
+def text_to_speech(text, voice_name="en-US-AriaNeural"):
+    async def generate():
+        communicate = edge_tts.Communicate(
+            text=text,
+            voice=voice_name,
+        )
+
+        audio_data = bytearray()
+
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_data.extend(chunk["data"])
+
+        return bytes(audio_data)
+
+    return asyncio.run(generate())
 
 # ============================================================
 # JSON PARSER
@@ -378,7 +429,6 @@ with st.sidebar:
         - WebM
         """
     )
-
 
 # ============================================================
 # AUDIO UPLOAD
@@ -689,3 +739,79 @@ if result:
             mime="application/json",
             use_container_width=True,
         )
+
+
+st.divider()
+
+st.header("🔊 Convert Speech/Text to Audio")
+
+text_input = st.text_area(
+    "Enter text",
+    height=250,
+    placeholder="Type or paste something you want to hear..."
+)
+
+language = st.selectbox(
+    "Language",
+    [
+        "English (US)",
+        "English (UK)",
+        "Nepali",
+        "Hindi",
+    ]
+)
+#cloud
+language_codes = {
+    "English (US)": "en-US",
+    "English (UK)": "en-GB",
+    "Nepali": "ne-NP",
+    "Hindi": "hi-IN",
+}
+#for edge tts
+voices = {
+    "English (US)": "en-US-AriaNeural",
+    "English (UK)": "en-GB-SoniaNeural",
+    "Nepali": "ne-NP-HemkalaNeural",
+    "Hindi": "hi-IN-SwaraNeural",
+}
+
+if st.button(
+    "🔊 Generate Audio",
+    type="primary",
+    use_container_width=True,
+):
+    if not text_input.strip():
+        st.warning("Please enter some text.")
+    else:
+        with st.spinner("Generating audio..."):
+            try:
+                #for clud text-teppech
+                # audio_output = text_to_speech(
+                #     text_input,
+                #     language_code=language_codes[language],
+                # )
+
+                #for edge tts
+                audio_output = text_to_speech(
+                    text_input,
+                    voice_name=voices[language],
+                )
+
+                st.success("Audio generated successfully!")
+
+                st.audio(
+                    audio_output,
+                    format="audio/mp3",
+                )
+
+                st.download_button(
+                    "⬇️ Download MP3",
+                    data=audio_output,
+                    file_name="generated_speech.mp3",
+                    mime="audio/mpeg",
+                    use_container_width=True,
+                )
+
+            except Exception as error:
+                st.error(f"Text-to-speech failed: {error}")
+
