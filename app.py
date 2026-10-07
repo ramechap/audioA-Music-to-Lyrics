@@ -282,32 +282,64 @@ def bark_text_to_audio(text):
         "Speaker 1 (en)",
         api_name="/gen_tts",
     )
+    
+    # Current Bark Space exposes the output as a Gradio audio result.
+    # gradio_client may return a filepath/string rather than
+    # (sample_rate, audio_array).
 
-    # Bark Space returns:
-    # (sample_rate, numpy_audio_array)
+    if isinstance(result, str):
+        with open(result, "rb") as audio_file:
+            return audio_file.read()
 
-    sample_rate, audio_array = result
-
-    import io
-    import wave
-    import numpy as np
-
-    audio_array = np.asarray(
-        audio_array,
-        dtype=np.int16,
-    )
-
-    buffer = io.BytesIO()
-
-    with wave.open(buffer, "wb") as wav_file:
-        wav_file.setnchannels(1)
-        wav_file.setsampwidth(2)
-        wav_file.setframerate(sample_rate)
-        wav_file.writeframes(
-            audio_array.tobytes()
+    # Some Gradio versions return a dictionary containing the filepath.
+    if isinstance(result, dict):
+        audio_path = (
+            result.get("path")
+            or result.get("name")
+            or result.get("url")
         )
 
-    return buffer.getvalue()
+        if audio_path and not audio_path.startswith("http"):
+            with open(audio_path, "rb") as audio_file:
+                return audio_file.read()
+
+    # Fallback for tuple/list audio data.
+    if isinstance(result, (tuple, list)):
+
+        # If it contains exactly sample_rate + numpy array
+        if len(result) == 2:
+            sample_rate, audio_array = result
+
+            import io
+            import wave
+            import numpy as np
+
+            audio_array = np.asarray(
+                audio_array,
+                dtype=np.int16,
+            )
+
+            buffer = io.BytesIO()
+
+            with wave.open(buffer, "wb") as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(sample_rate)
+                wav_file.writeframes(
+                    audio_array.tobytes()
+                )
+
+            return buffer.getvalue()
+
+        # Some versions wrap the actual result.
+        for item in result:
+            if isinstance(item, str):
+                with open(item, "rb") as audio_file:
+                    return audio_file.read()
+
+    raise RuntimeError(
+        f"Unexpected Bark response format: {type(result)}"
+    )
 
 # ============================================================
 # JSON PARSER
