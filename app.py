@@ -745,6 +745,11 @@ st.divider()
 
 st.header("🔊 Convert Speech/Text to Audio")
 
+generation_type = st.selectbox(
+    "Generate as",
+    ["Speech", "Music"]
+)
+
 text_input = st.text_area(
     "Enter text",
     height=250,
@@ -783,35 +788,70 @@ if st.button(
     if not text_input.strip():
         st.warning("Please enter some text.")
     else:
-        with st.spinner("Generating audio..."):
-            try:
-                #for clud text-teppech
-                # audio_output = text_to_speech(
-                #     text_input,
-                #     language_code=language_codes[language],
-                # )
 
-                #for edge tts
-                audio_output = text_to_speech(
-                    text_input,
-                    voice_name=voices[language],
-                )
+        # ====================================================
+        # SPEECH MODE
+        # ====================================================
 
-                st.success("Audio generated successfully!")
+        if generation_type == "Speech":
 
-                st.audio(
-                    audio_output,
-                    format="audio/mp3",
-                )
+            with st.spinner("Generating speech..."):
 
-                st.download_button(
-                    "⬇️ Download MP3",
-                    data=audio_output,
-                    file_name="generated_speech.mp3",
-                    mime="audio/mpeg",
-                    use_container_width=True,
-                )
+                try:
+                    audio_output = text_to_speech(
+                        text_input,
+                        voice_name=voices[language],
+                    )
 
-            except Exception as error:
-                st.error(f"Text-to-speech failed: {error}")
+                    st.success("Speech generated successfully!")
 
+                    st.audio(
+                        audio_output,
+                        format="audio/mp3",
+                    )
+
+                    st.download_button(
+                        "⬇️ Download Speech",
+                        data=audio_output,
+                        file_name="generated_speech.mp3",
+                        mime="audio/mpeg",
+                        use_container_width=True,
+                    )
+
+                except Exception as error:
+                    st.error(
+                        f"Text-to-speech failed: {error}"
+                    )
+
+
+        # ====================================================
+        # MUSIC MODE
+        # ====================================================
+
+        elif generation_type == "Music":
+
+            st.info(
+                "Music generation will use a local music model."
+            )
+
+            with st.spinner("Generating music..."):
+
+                try:
+                    # Music model code will go here
+                    # Example:
+                    #
+                    # audio_output = generate_music(text_input)
+                    #
+                    # st.audio(
+                    #     audio_output,
+                    #     format="audio/wav"
+                    # )
+
+                    st.warning(
+                        "Music generation model is not connected yet."
+                    )
+
+                except Exception as error:
+                    st.error(
+                        f"Music generation failed: {error}"
+                    )
