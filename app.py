@@ -9,6 +9,9 @@ from google.genai import types
 import asyncio
 import edge_tts
 from gradio_client import Client
+import io
+import soundfile as sf
+from kokoro import KPipeline
 
 
 # ============================================================
@@ -264,6 +267,67 @@ def text_to_speech(text, voice_name="en-US-AriaNeural"):
         return bytes(audio_data)
 
     return asyncio.run(generate())
+
+
+@st.cache_resource
+def get_kokoro_pipeline(lang_code):
+    return KPipeline(lang_code=lang_code)
+
+
+def kokoro_text_to_speech(text, language):
+    language_settings = {
+        "English (US)": {
+            "lang_code": "a",
+            "voice": "af_heart",
+        },
+        "English (UK)": {
+            "lang_code": "b",
+            "voice": "bf_emma",
+        },
+        "Hindi": {
+            "lang_code": "h",
+            "voice": "hf_alpha",
+        },
+    }
+
+    settings = language_settings[language]
+
+    pipeline = get_kokoro_pipeline(
+        settings["lang_code"]
+    )
+
+    audio_chunks = []
+
+    generator = pipeline(
+        text,
+        voice=settings["voice"],
+    )
+
+    for result in generator:
+        if result.audio is not None:
+            audio_chunks.append(
+                result.audio.numpy()
+            )
+
+    if not audio_chunks:
+        raise RuntimeError(
+            "Kokoro did not generate any audio."
+        )
+
+    import numpy as np
+
+    audio = np.concatenate(audio_chunks)
+
+    buffer = io.BytesIO()
+
+    sf.write(
+        buffer,
+        audio,
+        24000,
+        format="WAV",
+    )
+
+    return buffer.getvalue()
 
 
 def bark_text_to_audio(text):
@@ -822,6 +886,14 @@ st.divider()
 
 st.header("🔊 Convert Speech/Text to Audio")
 
+tts_engine = st.selectbox(
+    "TTS Engine",
+    [
+        "Edge TTS",
+        "Kokoro-82M",
+    ],
+)
+
 generation_type = st.selectbox(
     "Generate as",
     ["Speech", "Music"]
@@ -875,25 +947,55 @@ if st.button(
             with st.spinner("Generating speech..."):
 
                 try:
-                    audio_output = text_to_speech(
-                        text_input,
-                        voice_name=voices[language],
-                    )
+                    if tts_engine == "Edge TTS":
+
+                        audio_output = text_to_speech(
+                            text_input,
+                            voice_name=voices[language],
+                        )
+                    
+                        audio_format = "audio/mp3"
+                        file_name = "generated_speech.mp3"
+                        mime_type = "audio/mpeg"
+                    
+                    else:
+                    
+                        audio_output = kokoro_text_to_speech(
+                            text_input,
+                            language,
+                        )
+                    
+                        audio_format = "audio/wav"
+                        file_name = "generated_speech_kokoro.wav"
+                        mime_type = "audio/wav"
 
                     st.success("Speech generated successfully!")
-
+                    
                     st.audio(
                         audio_output,
-                        format="audio/mp3",
+                        format=audio_format,
                     )
-
+                    
                     st.download_button(
                         "⬇️ Download Speech",
                         data=audio_output,
-                        file_name="generated_speech.mp3",
-                        mime="audio/mpeg",
+                        file_name=file_name,
+                        mime=mime_type,
                         use_container_width=True,
                     )
+
+                    # st.audio(
+                    #     audio_output,
+                    #     format="audio/mp3",
+                    # )
+
+                    # st.download_button(
+                    #     "⬇️ Download Speech",
+                    #     data=audio_output,
+                    #     file_name="generated_speech.mp3",
+                    #     mime="audio/mpeg",
+                    #     use_container_width=True,
+                    # )
 
                 except Exception as error:
                     st.error(
