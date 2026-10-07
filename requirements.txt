@@ -2,3 +2,5 @@ streamlit
 google-genai
 google-cloud-texttospeech
 edge-tts
+gradio-client
+numpy
