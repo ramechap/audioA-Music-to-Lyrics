@@ -17,7 +17,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🎙️ Gemini Audio Recognition")
+st.title("🎙️ Convert your audio to beautiful lyrics")
 st.caption("Upload an audio file and get a transcript, language detection, summary, keywords, and speaker information.")
 
 
