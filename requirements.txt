@@ -1,9 +1,9 @@
+google-cloud-texttospeech
+gradio-client
 streamlit
 google-genai
-google-cloud-texttospeech
 edge-tts
-gradio-client
-numpy
 kokoro
 soundfile
+numpy>=2.1
 
