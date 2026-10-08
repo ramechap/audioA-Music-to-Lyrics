@@ -6,3 +6,5 @@ gradio-client
 kokoro==0.9.4
 soundfile
 numpy==1.26.4
+torch
+torchvision
