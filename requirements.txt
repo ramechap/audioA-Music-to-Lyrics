@@ -1,13 +1,8 @@
-google-cloud-texttospeech
-gradio-client
 streamlit
 google-genai
+google-cloud-texttospeech
 edge-tts
+gradio-client
 kokoro==0.9.4
 soundfile
 numpy==1.26.4
-
-
-
-
-
