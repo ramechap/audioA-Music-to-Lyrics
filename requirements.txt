@@ -3,7 +3,11 @@ gradio-client
 streamlit
 google-genai
 edge-tts
-kokoro
+kokoro==0.9.4
 soundfile
-numpy>=2.1
+numpy==1.26.4
+
+
+
+
 
