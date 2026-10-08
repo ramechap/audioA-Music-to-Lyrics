@@ -269,12 +269,23 @@ def text_to_speech(text, voice_name="en-US-AriaNeural"):
     return asyncio.run(generate())
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def get_kokoro_pipeline(lang_code):
-    return KPipeline(lang_code=lang_code)
+    """Load and cache one Kokoro pipeline per language."""
+    try:
+        return KPipeline(lang_code=lang_code)
+    except Exception as error:
+        raise RuntimeError(
+            f"Could not load Kokoro pipeline for language "
+            f"'{lang_code}': {error}"
+        ) from error
 
 
-def kokoro_text_to_speech(text, language):
+def kokoro_text_to_speech(
+    text,
+    language,
+    speed=1.0,
+):
     language_settings = {
         "English (US)": {
             "lang_code": "a",
@@ -290,28 +301,51 @@ def kokoro_text_to_speech(text, language):
         },
     }
 
+    if language not in language_settings:
+        raise ValueError(
+            f"Kokoro does not currently have a configured voice "
+            f"for {language}."
+        )
+
     settings = language_settings[language]
 
+    # Load the correct language pipeline.
     pipeline = get_kokoro_pipeline(
         settings["lang_code"]
     )
 
+    text = text.strip()
+
+    if not text:
+        raise ValueError("Text is empty.")
+
     audio_chunks = []
 
-    generator = pipeline(
-        text,
-        voice=settings["voice"],
-    )
+    try:
+        generator = pipeline(
+            text,
+            voice=settings["voice"],
+            speed=float(speed),
+            split_pattern=r"\n+",
+        )
 
-    for result in generator:
-        if result.audio is not None:
+        for result in generator:
+            if result.audio is None:
+                continue
+
             audio_chunks.append(
-                result.audio.numpy()
+                result.audio.detach().cpu().numpy()
             )
+
+    except Exception as error:
+        raise RuntimeError(
+            f"Kokoro synthesis failed: {error}"
+        ) from error
 
     if not audio_chunks:
         raise RuntimeError(
-            "Kokoro did not generate any audio."
+            "Kokoro completed but returned no audio. "
+            "Check the selected voice, language, and espeak-ng installation."
         )
 
     import numpy as np
