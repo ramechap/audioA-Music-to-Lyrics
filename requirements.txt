@@ -6,8 +6,11 @@ edge-tts==7.2.8
 gradio-client==2.7.2
 
 kokoro==0.9.4
+misaki[en]==0.9.4
 soundfile==0.14.0
 numpy==1.26.4
 
 torch==2.8.0
 torchvision==0.23.0
+
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
